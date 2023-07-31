@@ -1,4 +1,5 @@
-import os.path, sys, tempfile, time
+import esptool
+import os.path, sys, tempfile, time, JSON
 
 baud_rate = "115200"
 
@@ -14,7 +15,6 @@ print("Flash size is %dM (%d bytes)" % (int(sys.argv[2]),flash_size))
 workdir=tempfile.mkdtemp()
 #taken from https://github.com/espressif/esptool/blob/fa7e37aa4c0ef0221f25c4aff45bcdca36bf146c/flasher_stub/esptool_test_stub.py
 sys.path.append("..")
-import esptool
 
 print("Connecting... Be sure that the ESP is in the bootloader. Maybe tie GPIO0 to GND")
 cmd_con = [
@@ -30,17 +30,17 @@ def match_files(fname_a,fname_b):
     file_a = open(fname_a,'rb')
     file_b = open(fname_b,'rb')
     start_idx = None
-    bad_parts=[]
+    bad_parts={}
     for idx in range (0,flash_size-1):
         if file_a.read(1) != file_b.read(1):
             if start_idx == None:
                 start_idx = idx
         else:
             if start_idx != None:
-                bad_parts.append("%d-%d"%(start_idx,idx-1))
+                bad_parts[start_idx]=idx-start_idx
                 start_idx = None
     if start_idx != None:
-        bad_parts.append("%d-%d"% (start_idx,flash_size-1))
+        bad_parts[start_idx]=flash_size-1-start_idx
     
     return bad_parts
 
@@ -85,6 +85,12 @@ test_names = {
 
 test_results={}
 
+def sum_bad_parts(bad_parts):
+    bp_sum = 0
+    for k in bad_parts.keys():
+        bp_sum += bad_parts[k]
+    return bp_sum
+
 def test_esp(t):
     test_name = test_names[t]
     print("==== Testing with "+test_name+" ====")
@@ -101,14 +107,18 @@ def test_esp(t):
             test_dat_file.write(b'\x55')
     test_dat_file.close()
     bad_parts = exec_test(file_name)
-    print("Found %d bad parts" % len(bad_parts))
+    print("\n==== Found %d bad parts totaling %d bytes ====\n" % (len(bad_parts.keys()), sum_bad_parts(bad_parts)))
     test_results[test_name]=bad_parts
 
 test_esp(0)
 test_esp(1)
 test_esp(2)
 
-print(test_results)
+print("\n\n")
+
+res_print = input("Print JSON results? [y/N] ")
+if res_print == "y" or res_print == "Y":
+    print(test_results)
 
 res_fn = input("Save JSON results as (leave blank to skip): ")
 if len(res_fn)>0:
