@@ -87,7 +87,7 @@ def exec_test(file_name,mem_type):
     print("=== Reading back test data ===")
     esptool.main(cmd_dn)
     
-    return match_files(file_name,file_name+'_dl')
+    return match_files(file_name,file_name+'_dl',length)
     
 
 test_names = [
